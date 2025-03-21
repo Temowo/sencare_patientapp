@@ -32,7 +32,7 @@ class HomeScreen extends StatelessWidget {
             SizedBox(height: 30),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                primary: Colors.green,
+                backgroundColor: Colors.green,
                 padding: EdgeInsets.symmetric(vertical: 12, horizontal: 35),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),

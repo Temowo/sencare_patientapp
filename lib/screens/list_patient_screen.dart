@@ -161,7 +161,7 @@ class FilterButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        primary: isActive ? Colors.blue : Colors.grey,
+        backgroundColor: isActive ? Colors.blue : Colors.grey,
       ),
       onPressed: onPressed,
       child: Text(text),
