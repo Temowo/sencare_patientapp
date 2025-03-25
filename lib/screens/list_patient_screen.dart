@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import 'package:sencare_patientapp/screens/view_patient_record_screen.dart';
+
 class ListPatientScreen extends StatefulWidget {
   @override
   _ListPatientScreenState createState() => _ListPatientScreenState();
@@ -20,21 +22,23 @@ class _ListPatientScreenState extends State<ListPatientScreen> {
     fetchPatients();
   }
 
-  Future<void> fetchPatients() async {
-    final response = await http.get(Uri.parse('http://172.20.10.6:5000/patients'));
+ Future<void> fetchPatients() async {
+  final response = await http.get(Uri.parse('http://localhost:5001/patients'));
 
-    if (response.statusCode == 200) {
-      setState(() {
-        patients = json.decode(response.body);
-        filteredPatients = patients;
-        loading = false;
-      });
-    } else {
-      setState(() {
-        loading = false;
-      });
-    }
+  if (response.statusCode == 200) {
+    List data = json.decode(response.body);
+    print("Fetched Patients: $data"); // Debugging
+    setState(() {
+      patients = data;
+      filteredPatients = patients;
+      loading = false;
+    });
+  } else {
+    setState(() {
+      loading = false;
+    });
   }
+}
 
   void applyFilter() {
     List filtered = patients;
@@ -128,7 +132,13 @@ class _ListPatientScreenState extends State<ListPatientScreen> {
                 return PatientCard(
                   patient: patient,
                   onTap: () {
-                    Navigator.pushNamed(context, '/view_patient_record_screen', arguments: patient);
+                   Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => ViewPatientRecordScreen(patient: patient),
+  ),
+);
+
                   },
                 );
               },

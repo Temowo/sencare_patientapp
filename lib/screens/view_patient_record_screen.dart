@@ -17,7 +17,8 @@ class _ViewPatientRecordScreenState extends State<ViewPatientRecordScreen> {
   bool showTestForm = false;
   String selectedTest = "";
   DateTime testDate = DateTime.now();
-  bool isDatePickerVisible = false;  // ✅ Renamed variable to avoid conflict
+  bool isDatePickerVisible = false;
+  String testResult = "";  
   String selectedLocation = "";
   List<Map<String, dynamic>> savedTests = [];
   late Map<String, dynamic> editedPatient;
@@ -28,11 +29,13 @@ class _ViewPatientRecordScreenState extends State<ViewPatientRecordScreen> {
   @override
   void initState() {
     super.initState();
+    print("Received Patient Data: ${widget.patient}");
     editedPatient = Map.from(widget.patient);
+    editedPatient['critical'] ??= false;
   }
 
   void handleDelete() async {
-    final response = await http.delete(Uri.parse('http://172.20.10.6:5000/patients/${widget.patient["_id"]}'));
+    final response = await http.delete(Uri.parse('http://localhost:5001/patients/${widget.patient["_id"]}'));
 
     if (response.statusCode == 200) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Patient record deleted successfully')));
@@ -42,27 +45,56 @@ class _ViewPatientRecordScreenState extends State<ViewPatientRecordScreen> {
     }
   }
 
-  void handleSaveTest() {
-    if (selectedTest.isEmpty || selectedLocation.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select a test type and location')));
-      return;
-    }
-
-    final newTest = {
-      'type': selectedTest,
-      'date': DateFormat('yyyy-MM-dd').format(testDate),
-      'location': selectedLocation,
-    };
-    setState(() {
-      savedTests.add(newTest);
-      showTestForm = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Test details saved successfully')));
+  void handleSaveTest() async {
+  if (selectedTest.isEmpty || selectedLocation.isEmpty|| testResult.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select a test type and location')));
+    return;
   }
+
+  final newTest = {
+    'patientId': widget.patient["_id"], // Ensure you're passing this from the patient screen
+    'type': selectedTest,
+    'date': DateFormat('yyyy-MM-dd').format(testDate),
+    'location': selectedLocation,
+    'result': testResult, // Ensure testResult is provided in your UI
+  };
+
+  try {
+    final response = await http.post(
+      Uri.parse('http://localhost:5001/tests'), // Change to your actual API URL
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode(newTest),
+    );
+
+    if (response.statusCode == 201) {
+      final responseData = jsonDecode(response.body);
+      bool isCritical = responseData['isCritical']; // Get updated status
+
+      setState(() {
+        savedTests.add(newTest);
+        showTestForm = false;
+        editedPatient['critical'] = isCritical;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Test saved successfully. Patient status: ${isCritical ? "Critical" : "Stable"}')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving test: ${response.body}')),
+      );
+    }
+  } catch (error) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Failed to save test. Check your connection.')),
+    );
+  }
+}
+
 
   void handleSavePatient() async {
     final response = await http.put(
-      Uri.parse('http://172.20.10.6:5000/patients/${widget.patient["_id"]}'),
+      Uri.parse('http://localhost:5001/patients/${widget.patient["_id"]}'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode(editedPatient),
     );
@@ -79,10 +111,10 @@ class _ViewPatientRecordScreenState extends State<ViewPatientRecordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('${widget.patient["name"]}\'s Record'),
-        actions: [
+return Scaffold(
+  appBar: AppBar(
+    title: Text('${widget.patient["name"] ?? "Unknown"}\'s Record'),
+    actions: [
           IconButton(
             icon: Icon(Icons.edit),
             onPressed: () {
@@ -108,7 +140,7 @@ class _ViewPatientRecordScreenState extends State<ViewPatientRecordScreen> {
             _buildPatientDetail('Diagnosis', editedPatient['diagnosis'], (value) => editedPatient['diagnosis'] = value),
             _buildPatientDetail('Phone', editedPatient['phone'], (value) => editedPatient['phone'] = value),
             _buildPatientDetail('Address', editedPatient['address'], (value) => editedPatient['address'] = value),
-            _buildPatientDetail('Critical Condition', editedPatient['critical'] ? 'Yes' : 'No', (value) => editedPatient['critical'] = value == 'Yes'),
+            _buildPatientDetail('Critical Condition',(editedPatient['critical'] ?? false) ? 'Yes' : 'No', (value) => editedPatient['critical'] = value == 'Yes'),
             _buildPatientDetail('Heart Rate', editedPatient['heart_rate'], (value) => editedPatient['heart_rate'] = value),
             _buildPatientDetail('Blood Pressure', editedPatient['blood_pressure'], (value) => editedPatient['blood_pressure'] = value),
             _buildPatientDetail('Respiratory Rate', editedPatient['respiratory_rate'], (value) => editedPatient['respiratory_rate'] = value),
@@ -158,103 +190,39 @@ class _ViewPatientRecordScreenState extends State<ViewPatientRecordScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          'Patient Tests',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        Text('Patient Tests', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         IconButton(
           icon: Icon(showTestForm ? Icons.remove_circle : Icons.add_circle, color: Colors.blue),
-          onPressed: () {
-            setState(() {
-              showTestForm = !showTestForm;
-            });
-          },
+          onPressed: () => setState(() => showTestForm = !showTestForm),
         ),
       ],
     );
   }
 
   Widget _buildTestForm() {
-    return Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          DropdownButtonFormField<String>(
-            decoration: InputDecoration(
-              labelText: 'Test Type',
-              border: OutlineInputBorder(),
-            ),
-            value: selectedTest.isNotEmpty ? selectedTest : null,
-            onChanged: (value) {
-              setState(() {
-                selectedTest = value!;
-              });
-            },
-            items: testTypes.map((test) {
-              return DropdownMenuItem<String>(
-                value: test,
-                child: Text(test),
-              );
-            }).toList(),
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Test Date',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 8),
-          Row(
-            children: [
-              Text(DateFormat('yyyy-MM-dd').format(testDate)),
-    IconButton(
-      icon: Icon(Icons.calendar_today),
-      onPressed: () {
-        showDatePicker(
-          context: context,
-          initialDate: testDate,
-          firstDate: DateTime(2000),
-          lastDate: DateTime(2100),
-        ).then((date) {
-          if (date != null) {
-            setState(() {
-              testDate = date;
-            });
-          }
-        });
-      },
-    ),
-  ],
-),
-SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            decoration: InputDecoration(
-              labelText: 'Location',
-              border: OutlineInputBorder(),
-            ),
-            value: selectedLocation.isNotEmpty ? selectedLocation : null,
-            onChanged: (value) {
-              setState(() {
-                selectedLocation = value!;
-              });
-            },
-            items: clinicOptions.map((clinic) {
-              return DropdownMenuItem<String>(
-                value: clinic,
-                child: Text(clinic),
-              );
-            }).toList(),
-          ),
-          SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: handleSaveTest,
-            child: Text('Save Test Details'),
-          ),
-        ],
-      ),
+    return Column(
+      children: [
+        DropdownButtonFormField<String>(
+          decoration: InputDecoration(labelText: 'Test Type', border: OutlineInputBorder()),
+          value: selectedTest.isNotEmpty ? selectedTest : null,
+          onChanged: (value) => setState(() => selectedTest = value!),
+          items: testTypes.map((test) => DropdownMenuItem(value: test, child: Text(test))).toList(),
+        ),
+        SizedBox(height: 16),
+        TextFormField(
+          decoration: InputDecoration(labelText: 'Test Result', border: OutlineInputBorder()),
+          onChanged: (value) => setState(() => testResult = value),
+        ),
+        SizedBox(height: 16),
+        DropdownButtonFormField<String>(
+          decoration: InputDecoration(labelText: 'Location', border: OutlineInputBorder()),
+          value: selectedLocation.isNotEmpty ? selectedLocation : null,
+          onChanged: (value) => setState(() => selectedLocation = value!),
+          items: clinicOptions.map((clinic) => DropdownMenuItem(value: clinic, child: Text(clinic))).toList(),
+        ),
+        SizedBox(height: 16),
+        ElevatedButton(onPressed: handleSaveTest, child: Text('Save Test')),
+      ],
     );
   }
 
@@ -262,30 +230,24 @@ SizedBox(height: 16),
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Saved Tests',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
+        Text('Saved Tests', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         SizedBox(height: 8),
         Table(
           border: TableBorder.all(),
           children: [
-            TableRow(
-              decoration: BoxDecoration(color: Colors.grey[200]),
-              children: [
-                _buildTableHeader('Test Type'),
-                _buildTableHeader('Test Date'),
-                _buildTableHeader('Test Location'),
-              ],
-            ),
+            TableRow(children: [
+              _buildTableHeader('Test Type'),
+              _buildTableHeader('Test Date'),
+              _buildTableHeader('Test Location'),
+              _buildTableHeader('Result'),
+            ]),
             for (var test in savedTests)
-              TableRow(
-                children: [
-                  _buildTableCell(test['type']),
-                  _buildTableCell(test['date']),
-                  _buildTableCell(test['location']),
-                ],
-              ),
+              TableRow(children: [
+                _buildTableCell(test['type']),
+                _buildTableCell(test['date']),
+                _buildTableCell(test['location']),
+                _buildTableCell(test['result']),
+              ]),
           ],
         ),
       ],
@@ -295,21 +257,14 @@ SizedBox(height: 16),
   Widget _buildTableHeader(String text) {
     return Padding(
       padding: const EdgeInsets.all(8.0),
-      child: Text(
-        text,
-        style: TextStyle(fontWeight: FontWeight.bold),
-        textAlign: TextAlign.center,
-      ),
+      child: Text(text, style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
     );
   }
 
   Widget _buildTableCell(String text) {
     return Padding(
       padding: const EdgeInsets.all(8.0),
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-      ),
+      child: Text(text, textAlign: TextAlign.center),
     );
   }
 }

@@ -14,10 +14,10 @@ class HomeScreen extends StatelessWidget {
             Text(
               'WELCOME TO SENCARE APP',
               style: TextStyle(
-                fontSize: 32,
+                fontSize: 24,
                 fontWeight: FontWeight.w600,
                 fontStyle: FontStyle.italic,
-                color: Colors.red,
+                color: const Color.fromARGB(255, 37, 107, 187),
               ),
               textAlign: TextAlign.center,
             ),

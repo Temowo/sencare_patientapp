@@ -74,7 +74,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       'temperature': double.tryParse(_temperatureController.text),
     };
 
-    final url = Uri.parse('http://172.20.10.6:5000/patients');
+    final url = Uri.parse('http://localhost:5001/patients');
     try {
       final response = await http.post(
         url,
