@@ -2,14 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-import 'package:sencare_patientapp/screens/view_patient_record_screen.dart';
+import 'view_patient_record_screen.dart';
 
 class ListPatientScreen extends StatefulWidget {
+  final http.Client? client;
+
+  const ListPatientScreen({this.client, Key? key}) : super(key: key);
+
   @override
   _ListPatientScreenState createState() => _ListPatientScreenState();
 }
 
 class _ListPatientScreenState extends State<ListPatientScreen> {
+  late http.Client client;
   List patients = [];
   List filteredPatients = [];
   bool loading = true;
@@ -19,26 +24,26 @@ class _ListPatientScreenState extends State<ListPatientScreen> {
   @override
   void initState() {
     super.initState();
+    client = widget.client ?? http.Client();
     fetchPatients();
   }
 
- Future<void> fetchPatients() async {
-  final response = await http.get(Uri.parse('http://localhost:5001/patients'));
+  Future<void> fetchPatients() async {
+    final response = await client.get(Uri.parse('http://localhost:5001/patients'));
 
-  if (response.statusCode == 200) {
-    List data = json.decode(response.body);
-    print("Fetched Patients: $data"); // Debugging
-    setState(() {
-      patients = data;
-      filteredPatients = patients;
-      loading = false;
-    });
-  } else {
-    setState(() {
-      loading = false;
-    });
+    if (response.statusCode == 200) {
+      List data = json.decode(response.body);
+      setState(() {
+        patients = data;
+        filteredPatients = patients;
+        loading = false;
+      });
+    } else {
+      setState(() {
+        loading = false;
+      });
+    }
   }
-}
 
   void applyFilter() {
     List filtered = patients;
@@ -50,7 +55,11 @@ class _ListPatientScreenState extends State<ListPatientScreen> {
     }
 
     if (searchText.isNotEmpty) {
-      filtered = filtered.where((patient) => (patient['name'] as String).toLowerCase().contains(searchText.toLowerCase())).toList();
+      filtered = filtered
+          .where((patient) => (patient['name'] as String)
+              .toLowerCase()
+              .contains(searchText.toLowerCase()))
+          .toList();
     }
 
     setState(() {
@@ -132,13 +141,13 @@ class _ListPatientScreenState extends State<ListPatientScreen> {
                 return PatientCard(
                   patient: patient,
                   onTap: () {
-                   Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (context) => ViewPatientRecordScreen(patient: patient),
-  ),
-);
-
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            ViewPatientRecordScreen(patient: patient),
+                      ),
+                    );
                   },
                 );
               },
@@ -208,7 +217,7 @@ class PatientCard extends StatelessWidget {
               ),
               Text('Age: ${patient['age'] ?? 'N/A'}'),
               Text('Diagnosis: ${patient['diagnosis'] ?? 'N/A'}'),
-              Text('Status: ${patient['critical'] as bool ? 'Critical' : 'Stable'}'),
+              Text('Status: ${patient['critical'] ? 'Critical' : 'Stable'}'),
             ],
           ),
         ),
